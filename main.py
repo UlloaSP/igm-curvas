@@ -104,7 +104,6 @@ def run_ex1(
     R: float = 1.5,
     r: float = 0.5,
     rs: float = 0.5,
-    plot_convergence: bool = True,
 ) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     box = make_box(box_name)
@@ -141,12 +140,6 @@ def run_ex1(
         c_TS2 += int(mTS2.sum())
         c_union += int(mU.sum())
         done += n
-
-        if plot_convergence:
-            xs.append(done)
-            vt_series.append(volume_mc(Vbox, c_T, done))
-            vs1_series.append(volume_mc(Vbox, c_S1, done))
-            vunion_series.append(volume_mc(Vbox, c_union, done))
 
     ev = exact_volumes(R=R, r=r, rs=rs)
     Vt_exact, Vs_exact = ev["V_T_exact"], ev["V_S_exact"]
@@ -233,6 +226,62 @@ def de_casteljau(ctrl: np.ndarray, t: float) -> np.ndarray:
 def sample_bezier(ctrl: np.ndarray, n: int = 200) -> np.ndarray:
     ts = np.linspace(0.0, 1.0, n, dtype=float)
     return np.vstack([de_casteljau(ctrl, float(t)) for t in ts])
+
+
+def plot_torus_and_spheres(R: float = 1.5, r: float = 0.5, rs: float = 0.5) -> None:
+    """Visualiza el toro y las dos esferas S1 y S2 en 3D."""
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(111, projection="3d")
+
+    # Generar el toro
+    u = np.linspace(0, 2 * np.pi, 60)
+    v = np.linspace(0, 2 * np.pi, 60)
+    u, v = np.meshgrid(u, v)
+
+    x_torus = (R + r * np.cos(v)) * np.cos(u)
+    y_torus = (R + r * np.cos(v)) * np.sin(u)
+    z_torus = r * np.sin(v)
+
+    # Generar esfera S1 (centro en x=2)
+    phi = np.linspace(0, np.pi, 30)
+    theta = np.linspace(0, 2 * np.pi, 30)
+    phi, theta = np.meshgrid(phi, theta)
+
+    x_s1 = rs * np.sin(phi) * np.cos(theta) + 2.0
+    y_s1 = rs * np.sin(phi) * np.sin(theta)
+    z_s1 = rs * np.cos(phi)
+
+    # Generar esfera S2 (centro en x=-2)
+    x_s2 = rs * np.sin(phi) * np.cos(theta) - 2.0
+    y_s2 = rs * np.sin(phi) * np.sin(theta)
+    z_s2 = rs * np.cos(phi)
+
+    # Dibujar las superficies
+    ax.plot_surface(x_torus, y_torus, z_torus, alpha=0.6, color="blue", label="Toro")
+    ax.plot_surface(x_s1, y_s1, z_s1, alpha=0.7, color="red")
+    ax.plot_surface(x_s2, y_s2, z_s2, alpha=0.7, color="green")
+
+    # Configurar ejes
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_title(f"Toro (R={R}, r={r}) y Esferas S1, S2 (rs={rs})")
+
+    # Leyenda manual (plot_surface no soporta label directamente)
+    from matplotlib.patches import Patch
+
+    legend_elements = [
+        Patch(facecolor="blue", alpha=0.6, label="Toro"),
+        Patch(facecolor="red", alpha=0.7, label="S1 (x=2)"),
+        Patch(facecolor="green", alpha=0.7, label="S2 (x=-2)"),
+    ]
+    ax.legend(handles=legend_elements, loc="upper left")
+
+    # Ajustar aspecto
+    ax.set_box_aspect([1, 1, 0.3])
+
+    plt.tight_layout()
+    plt.show()
 
 
 def _tokenize_path(d: str) -> List[str]:
@@ -816,7 +865,6 @@ def main() -> None:
             box_name=args.box,
             torus_form=args.torus_form,
             batch=max(1, args.batch),
-            plot_convergence=True,
         )
 
     if not args.skip_bezier:
