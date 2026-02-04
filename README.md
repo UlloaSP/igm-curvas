@@ -1,0 +1,2 @@
+# igm-curvas
+Práctica Curvas
