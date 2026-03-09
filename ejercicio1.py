@@ -27,15 +27,8 @@ class Box3D:
         return float(d[0] * d[1] * d[2])
 
 
-def make_box(name: str) -> Box3D:
-    name = name.lower().strip()
-    if name == "cube":
-        return Box3D(low=np.array([-3.0, -3.0, -3.0]), high=np.array([3.0, 3.0, 3.0]))
-    if name == "tight":
-        # Caja más ajustada (opcional) que contiene toroide (R=1.5,r=0.5) y esferas en x=±2 con rs=0.5:
-        # x ∈ [-2.5, 2.5], y ∈ [-2.0, 2.0], z ∈ [-0.5, 0.5]
-        return Box3D(low=np.array([-2.5, -2.0, -0.5]), high=np.array([2.5, 2.0, 0.5]))
-    raise ValueError("box debe ser 'cube' o 'tight'")
+def make_box() -> Box3D:
+    return Box3D(low=np.array([-3.0, -3.0, -3.0]), high=np.array([3.0, 3.0, 3.0]))
 
 
 def sample_uniform_in_box(rng: np.random.Generator, box: Box3D, n: int) -> np.ndarray:
@@ -91,14 +84,13 @@ def se_mc(Vbox: float, count: int, N: int) -> float:
 def run_ex1(
     N: int,
     seed: int,
-    box_name: str,
     batch: int,
     R: float = 1.5,
     r: float = 0.5,
     rs: float = 0.5
 ) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
-    box = make_box(box_name)
+    box = make_box()
     Vbox = box.volume
 
 
@@ -108,11 +100,6 @@ def run_ex1(
     c_TS1 = 0
     c_TS2 = 0
     c_union = 0
-
-    xs = []
-    vt_series = []
-    vs1_series = []
-    vunion_series = []
 
     done = 0
     while done < N:
@@ -159,7 +146,7 @@ def run_ex1(
 
     df = pd.DataFrame(rows)
     df["N"] = N
-    df["box"] = box_name
+    df["box"] = "cube"
     df["V_box"] = Vbox
     df["abs_error"] = df["V_hat"] - df["V_exact"]
     df["rel_error"] = df["abs_error"] / df["V_exact"]
@@ -253,14 +240,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--N", type=int, default=600000)
     parser.add_argument("--seed", type=int, default=123)
-    parser.add_argument("--box", type=str, choices=["cube", "tight"], default="cube")
     parser.add_argument("--batch", type=int, default=100000)
     args = parser.parse_args()
 
     run_ex1(
         N=args.N,
         seed=args.seed,
-        box_name=args.box,
         batch=max(1, args.batch)
     )
     
