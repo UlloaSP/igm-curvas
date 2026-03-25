@@ -11,8 +11,8 @@ Se entrega este informe junto con el codigo fuente `ex1.py` y `ex2.py`.
 Se ejecutaron los scripts `ex1.py` (Ejercicio 1) y `ex2.py` (Ejercicio 2) con los comandos:
 
 ```bash
-uv run python ex1.py --no-show --output-dir outputs
-uv run python ex2.py --no-show --output-dir outputs
+python ex1.py --output-dir outputs
+python ex2.py --output-dir outputs
 ```
 
 ## Ejercicio 1 - Monte Carlo para toro y esferas
@@ -109,68 +109,64 @@ En esta imagen se representa la geometria del problema del ejercicio 1. Se ve el
 
 ## Ejercicio 2 - Curvas de Bezier para una figura 2D
 
-En este ejercicio se construye una figura 2D mediante un spline a trozos formado por curvas de Bezier cubica. La figura elegida es el circuito de Interlagos.
+En este ejercicio se dibuja una figura 2D mediante un spline a trozos formado por curvas de Bezier cubica. La figura utilizada es el contorno del circuito de Interlagos.
 
-### Eleccion de la figura
+### Figura utilizada
 
-Se eligio el circuito de Interlagos porque es una figura 2D cerrada, reconocible y con suficiente complejidad geometrica como para necesitar varios tramos de curva enlazados. En esta entrega el trazado base se define directamente en el codigo, sin depender de un SVG externo durante la construccion de la figura. Esto lo hace apropiado para mostrar:
-- como se construye una figura a partir de varios segmentos de Bezier,
-- como influyen los puntos de control en la forma final,
-- y como una modificacion local altera solo una parte del trazado.
+Se toma como figura 2D el trazado cerrado del circuito de Interlagos. El contorno base se define directamente en el codigo mediante una lista de tramos Bezier cubicos.
 
-### Como se construye la curva
+### Trazos y puntos de control
 
-La figura se descompone en `23` tramos de Bezier cubica. Cada tramo modela una parte local del contorno del circuito y el conjunto de todos ellos reconstruye la curva cerrada completa. Cada tramo se define con `4` puntos de control, porque una curva de Bezier de grado `3` usa `n + 1 = 4` puntos de control:
+La figura se descompone en `23` tramos de Bezier cubica. Cada tramo se define con `4` puntos de control, porque una curva de Bezier de grado `3` usa `n + 1 = 4` puntos:
 - `P0`: punto inicial,
 - `C1`: primer punto de control,
 - `C2`: segundo punto de control,
 - `P3`: punto final.
 
+El conjunto de todos los tramos reconstruye el contorno completo del circuito.
+
+### Formula y evaluacion
+
 Para cada tramo se usa la formula de Bezier cubica
 
 `B(t) = (1 - t)^3 P0 + 3 (1 - t)^2 t C1 + 3 (1 - t) t^2 C2 + t^3 P3`, con `t` en `[0, 1]`.
 
-En el codigo, esta evaluacion se realiza mediante una implementacion recursiva del algoritmo de De Casteljau, que obtiene puntos de la curva por interpolaciones sucesivas entre los puntos de control. El trazado base se almacena en `SUBPATH_1_CUBICS`, y a continuacion se ajustan los handles de cada union para imponer continuidad de primera derivada. Despues, se muestrean muchos puntos de cada tramo y se unen para dibujar el contorno completo con Matplotlib.
+En el codigo, esta evaluacion se realiza mediante una implementacion recursiva del algoritmo de De Casteljau. El trazado base se almacena en `SUBPATH_1_CUBICS`. Despues, se muestrean muchos puntos de cada tramo y se unen para dibujar el contorno completo con Matplotlib.
 
 ### Continuidad entre tramos
 
-La continuidad pedida en el enunciado se comprueba y se fuerza explicitamente en el codigo. Primero se verifica que el trazado base ya cumple continuidad posicional (`C0`): el punto final de cada tramo coincide con el punto inicial del siguiente, de modo que no hay saltos ni huecos. Despues se ajustan los puntos de control interiores en cada union para igualar las derivadas laterales, imponiendo continuidad de primera derivada (`C1`).
+La continuidad se comprueba y se fuerza explicitamente en el codigo. Primero se verifica continuidad posicional (`C0`): el punto final de cada tramo coincide con el punto inicial del siguiente. Despues se ajustan los puntos de control interiores en cada union para igualar las derivadas laterales e imponer continuidad de primera derivada (`C1`).
 
 Para una union entre dos cubicas consecutivas, se toma el vector de salida del tramo anterior y el vector de entrada del tramo siguiente, y se sustituye ambos por su promedio. Asi, si `P` es el punto comun, se actualizan los handles para que el vector `P - C2` del tramo anterior coincida con el vector `C1 - P` del siguiente. De este modo, la tangente a ambos lados de la union pasa a ser la misma.
 
-Al ejecutar `ex2.py` se obtiene la siguiente comprobacion numerica de continuidad:
-- trazado base definido en codigo: `max_gap = 0`, `max_deriv = 333.999` y `23` fallos de `C1`;
-- circuito ajustado a `C1`: `max_gap = 0`, `max_deriv = 8.53e-14` y `0` fallos de `C1`;
-- circuito modificado: `max_gap = 0`, `max_deriv = 8.53e-14` y `0` fallos de `C1`.
+El trazado final queda conectado y con continuidad tangencial entre todos los tramos.
 
-Por tanto, el trazado final no solo esta conectado correctamente, sino que tambien conserva continuidad tangencial entre todos los tramos.
-
-### Que se dibuja
+### Elementos dibujados
 
 En las figuras se muestran:
 - la curva resultante,
 - los puntos de control de cada tramo,
 - y las rectas del poligono de control, incluidas las que unen los puntos proximos a los extremos de tramos consecutivos.
 
-Esto permite ver simultaneamente la forma final de la curva y la estructura geometrica que la genera.
+### Modificacion de puntos de control
 
-### Impacto de los puntos de control
-
-Una parte importante del ejercicio es comprobar como cambian las curvas al modificar los puntos de control. Para ello se genera:
+Para comprobar el efecto de la modificacion de los puntos de control se genera:
 - una version original del circuito,
 - una version modificada,
 - y una comparativa superpuesta.
 
-En la modificacion se altera el tercer segmento del trazado principal (`segment_idx = 2`). Se desplaza uno de sus puntos de control interiores con `delta = (18.0, -12.0)` y el otro se ajusta con el desplazamiento opuesto escalado (`-0.6 * delta`). A continuacion, el codigo reajusta automaticamente los handles de los segmentos vecino anterior y vecino posterior para conservar la misma derivada en ambos empalmes. Esta operacion cambia localmente la forma de la curva sin romper ni la conexion posicional ni la continuidad `C1` con los tramos contiguos.
+En la modificacion se altera el tercer segmento del trazado principal (`segment_idx = 2`). Se desplaza uno de sus puntos de control interiores con `delta = (18.0, -12.0)` y el otro se ajusta con el desplazamiento opuesto escalado (`-0.6 * delta`). A continuacion, el codigo reajusta automaticamente los handles de los segmentos vecino anterior y vecino posterior para conservar la misma derivada en ambos empalmes.
+
+### Imagenes generadas
 
 ![Circuito original](outputs/ex2_interlagos_original.png)
 
-Esta primera imagen muestra el circuito reconstruido mediante `23` tramos de Bezier cubica ya ajustados para cumplir continuidad `C1`. Los puntos visibles son los puntos de control y las lineas punteadas grises forman el poligono de control. La figura permite ver como una forma cerrada relativamente compleja puede modelarse mediante un spline a trozos manteniendo una tangencia coherente entre segmentos consecutivos.
+Esta primera imagen muestra el circuito reconstruido mediante `23` tramos de Bezier cubica ajustados para cumplir continuidad `C1`. Los puntos visibles son los puntos de control y las lineas punteadas grises forman el poligono de control.
 
 ![Circuito modificado](outputs/ex2_interlagos_modificado.png)
 
-En esta segunda imagen se ve el mismo circuito tras modificar un tramo concreto del spline. Lo que se ha hecho es mover dos puntos de control interiores del tercer segmento para alterar su curvatura y, despues, reajustar los handles de los segmentos vecinos para preservar la continuidad `C1` en ambos empalmes. El efecto es local: cambia esa zona del circuito, pero el contorno sigue conectado, suave y reconocible.
+En esta segunda imagen se ve el mismo circuito tras modificar un tramo concreto del spline. Se mueven dos puntos de control interiores del tercer segmento y se reajustan los handles de los segmentos vecinos para preservar la continuidad `C1` en ambos empalmes.
 
 ![Comparativa entre ambas curvas](outputs/ex2_interlagos_comparacion.png)
 
-La tercera imagen superpone la curva original y la curva modificada. En esta comparacion la curva original se dibuja con linea continua y la modificada con linea discontinua; ese estilo de trazado solo sirve para distinguir visualmente ambas curvas y no indica una discontinuidad geometrica. La comparacion permite ver con claridad el impacto geometrico de mover los puntos de control: la deformacion se concentra en la region afectada, mientras que el resto del circuito apenas cambia. Al mismo tiempo, la curva modificada mantiene continuidad `C1`, de modo que la transicion entre tramos sigue siendo suave. Es precisamente esta sensibilidad local, compatible con una continuidad controlada, una de las propiedades mas utiles de las curvas de Bezier para modelado geometrico.
+La tercera imagen superpone la curva original y la curva modificada. En esta comparacion la curva original se dibuja con linea continua y la modificada con linea discontinua. Ese estilo de trazado solo sirve para distinguir visualmente ambas curvas y no indica una discontinuidad geometrica.
