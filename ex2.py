@@ -1,78 +1,76 @@
-# main2.py
-# Visualización de logo mediante curvas Bézier cúbicas (algoritmo de De Casteljau)
-# Requisitos: numpy, matplotlib
-
 from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from pathlib import Path as FilePath
 from typing import List, Tuple
 
-import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.path import Path
+import numpy as np
 from matplotlib.patches import PathPatch
+from matplotlib.path import Path as MplPath
 
 
 # ============================================================================
-# DATOS DEL LOGO: Curvas Bézier cúbicas preprocesadas
-# Cada curva tiene 4 puntos de control: [P0, C1, C2, P3]
+# TRAZADO BASE DEL CIRCUITO DE INTERLAGOS
+# Cada curva es una Bezier cubica con 4 puntos de control: [P0, C1, C2, P3]
 # ============================================================================
 
-# Subpath 1: Silueta principal (23 curvas)
 SUBPATH_1_CLOSED = True
 SUBPATH_1_CUBICS = [
-    [[208.00003, 495.4], [209.20003, 495.6], [210.40003, 495.8], [211.60003, 496.0]],
-    [[211.60003, 496.0], [190.70003, 486.1], [162.60003, 465.6], [143.80003, 451.1]],
-    [[143.80003, 451.1], [113.40003, 427.8], [89.70003, 393.2], [69.80003, 358.2]],
-    [[69.80003, 358.2], [153.90003, 403.9], [231.60003, 410.6], [248.30003, 406.4]],
-    [[248.30003, 406.4], [248.50003, 406.3], [240.60003, 360.9], [211.60003, 322.8]],
-    [[211.60003, 322.8], [181.10003, 282.9], [129.40003, 250.4], [129.40003, 250.4]],
-    [[129.40003, 250.4], [148.30003, 248.2], [167.30003, 247.8], [186.10003, 249.6]],
-    [[186.10003, 249.6], [218.30003, 252.6], [251.40003, 262.0], [277.60003, 284.3]],
-    [[277.60003, 284.3], [289.20003, 294.2], [310.40003, 323.3], [308.10003, 319.1]],
-    [[308.10003, 319.1], [295.60003, 287.9], [293.80003, 252.4], [295.80003, 218.5]],
-    [[295.80003, 218.5], [296.90003, 198.6], [299.00003, 178.9], [304.90003, 160.1]],
-    [[304.90003, 160.1], [309.90003, 144.0], [317.20003, 128.9], [325.50003, 114.8]],
+    [[115.55, 366.5416], [93.927, 366.3961], [54.085, 351.3476], [40.03, 337.0556]],
+    [[40.03, 337.0556], [25.636, 322.4186], [3.2, 241.5526], [3.2, 204.3056]],
+    [[3.2, 204.3056], [3.2, 194.2866], [16.614, 134.1896], [25.122, 106.0946]],
+    [[25.122, 106.0946], [26.2046, 102.5196], [31.893, 81.3696], [37.763, 59.0946]],
+    [[37.763, 59.0946], [50.082, 12.3446], [52.866, 5.9136], [61.701, 3.8036]],
+    [[61.701, 3.8036], [68.3795, 2.2087], [70.487, 3.1893], [78.269, 11.5087]],
+    [[78.269, 11.5087], [88.383, 22.3207], [91.135, 22.9267], [101.562, 16.6396]],
+    [[101.562, 16.6396], [130.208, -0.6324], [170.349, 14.3471], [179.152, 45.5946]],
+    [[179.152, 45.5946], [218.142, 184.0046], [236.312, 256.9946], [233.252, 262.9846]],
     [
-        [325.50003, 114.8],
-        [328.23336, 112.63333],
-        [330.9667, 110.46667],
-        [333.70003, 108.3],
+        [233.252, 262.9846],
+        [227.852, 273.5826],
+        [191.042, 280.7666],
+        [171.142, 275.1096],
     ],
-    [[333.70003, 108.3], [333.80003, 109.0], [325.80003, 220.1], [382.20003, 275.0]],
-    [[382.20003, 275.0], [484.80003, 374.8], [598.20003, 279.9], [598.20003, 279.9]],
-    [[598.20003, 279.9], [598.20003, 279.9], [593.70003, 355.1], [508.60003, 391.6]],
-    [[508.60003, 391.6], [712.40003, 410.4], [668.30003, 289.6], [668.30003, 289.6]],
-    [[668.30003, 289.6], [668.30003, 289.6], [738.10003, 319.4], [727.40003, 404.5]],
-    [[727.40003, 404.5], [717.70003, 481.5], [642.40003, 499.8], [626.70003, 502.8]],
-    [[626.70003, 502.8], [613.50003, 524.5], [513.50003, 689.6], [346.90003, 624.7]],
-    [[346.90003, 624.7], [166.30003, 554.4], [20.00003, 571.1], [20.00003, 571.1]],
-    [[20.00003, 571.1], [41.50003, 546.4], [66.70003, 526.5], [94.10003, 512.4]],
-    [[94.10003, 512.4], [129.70003, 494.0], [169.40003, 488.6], [208.00003, 495.4]],
-]
-
-# Subpath 2: Ojo pequeño (4 curvas)
-SUBPATH_2_CLOSED = True
-SUBPATH_2_CUBICS = [
-    [[522.00003, 511.3], [528.30003, 509.2], [534.70003, 507.1], [541.10003, 505.1]],
-    [[541.10003, 505.1], [540.60003, 499.0], [536.30003, 494.2], [531.10003, 494.2]],
-    [[531.10003, 494.2], [525.60003, 494.2], [521.00003, 499.6], [521.00003, 506.3]],
-    [[521.00003, 506.3], [521.10003, 508.1], [521.40003, 509.8], [522.00003, 511.3]],
-]
-
-# Subpath 3: Ojo grande (9 curvas)
-SUBPATH_3_CLOSED = True
-SUBPATH_3_CUBICS = [
-    [[481.90003, 508.9], [481.90003, 514.0], [482.80003, 518.8], [484.50003, 523.3]],
-    [[484.50003, 523.3], [488.30003, 522.4], [492.10003, 521.5], [495.70003, 520.3]],
-    [[495.70003, 520.3], [499.50003, 519.1], [503.20003, 517.8], [507.00003, 516.5]],
-    [[507.00003, 516.5], [505.90003, 513.4], [505.20003, 510.0], [505.20003, 506.4]],
-    [[505.20003, 506.4], [505.20003, 491.0], [516.80003, 478.5], [531.10003, 478.5]],
-    [[531.10003, 478.5], [543.70003, 478.5], [554.10003, 488.2], [556.50003, 501.0]],
-    [[556.50003, 501.0], [559.20003, 500.4], [561.80003, 499.7], [564.50003, 499.2]],
-    [[564.50003, 499.2], [560.10003, 480.7], [543.60003, 466.9], [523.80003, 466.9]],
-    [[523.80003, 466.9], [500.60003, 466.9], [481.90003, 485.7], [481.90003, 508.9]],
+    [
+        [171.142, 275.1096],
+        [159.892, 271.9136],
+        [156.162, 267.4546],
+        [101.542, 191.8646],
+    ],
+    [[101.542, 191.8646], [79.621, 161.5346], [79.625, 161.5346], [62.499, 162.2846]],
+    [[62.499, 162.2846], [41.668, 163.1946], [35.053, 170.4546], [30.782, 197.0846]],
+    [[30.782, 197.0846], [25.735, 228.5646], [28.751, 235.3746], [43.352, 225.4546]],
+    [[43.352, 225.4546], [56.752, 216.3545], [65.011, 215.8695], [72.329, 223.7554]],
+    [[72.329, 223.7554], [81.5174, 233.6574], [79.5066, 239.6194], [60.241, 259.5874]],
+    [[60.241, 259.5874], [44.627, 275.7744], [35.302, 300.0184], [41.89, 307.2984]],
+    [[41.89, 307.2984], [45.8157, 311.6362], [50.3499, 308.993], [61.869, 295.6554]],
+    [[61.869, 295.6554], [84.245, 269.7464], [99.533, 264.9154], [118.904, 277.6324]],
+    [
+        [118.904, 277.6324],
+        [130.046, 284.9472],
+        [165.146, 340.5304],
+        [162.412, 346.5304],
+    ],
+    [
+        [162.412, 346.5304],
+        [159.482, 352.9604],
+        [138.332, 363.0984],
+        [121.622, 366.0854],
+    ],
+    [
+        [121.622, 366.0854],
+        [119.822, 366.4064],
+        [117.782, 366.5514],
+        [115.552, 366.5363],
+    ],
+    [
+        [115.552, 366.5363],
+        [115.5513, 366.5381],
+        [115.5507, 366.5398],
+        [115.55, 366.5416],
+    ],
 ]
 
 
@@ -83,26 +81,107 @@ SUBPATH_3_CUBICS = [
 
 @dataclass
 class Subpath:
-    """Representa un subpath compuesto por curvas Bézier cúbicas."""
+    """Representa un subpath compuesto por curvas Bezier cubicas."""
 
-    cubics: List[np.ndarray]  # Lista de arrays (4, 2) con puntos de control
+    cubics: List[np.ndarray]
     closed: bool
 
 
-def get_logo_subpaths() -> List[Subpath]:
-    """Retorna los subpaths del logo como estructuras de datos."""
-    subpaths_data = [
-        (SUBPATH_1_CUBICS, SUBPATH_1_CLOSED),
-        (SUBPATH_2_CUBICS, SUBPATH_2_CLOSED),
-        (SUBPATH_3_CUBICS, SUBPATH_3_CLOSED),
-    ]
+@dataclass
+class ContinuityReport:
+    """Resumen numerico de continuidad entre tramos consecutivos."""
 
-    result = []
-    for cubics_list, closed in subpaths_data:
-        cubics = [np.array(cb, dtype=float) for cb in cubics_list]
-        result.append(Subpath(cubics=cubics, closed=closed))
+    max_positional_gap: float
+    max_derivative_mismatch: float
+    positional_discontinuities: List[Tuple[int, int, float]]
+    derivative_mismatches: List[Tuple[int, int, float]]
 
-    return result
+
+def cubic_start_tangent(ctrl: np.ndarray) -> np.ndarray:
+    """Retorna la derivada de la cubica en t = 0."""
+    return 3.0 * (ctrl[1] - ctrl[0])
+
+
+def cubic_end_tangent(ctrl: np.ndarray) -> np.ndarray:
+    """Retorna la derivada de la cubica en t = 1."""
+    return 3.0 * (ctrl[3] - ctrl[2])
+
+
+def raw_circuit_subpaths() -> List[Subpath]:
+    """Retorna el trazado base definido directamente en el codigo."""
+    cubics = [np.array(cb, dtype=float) for cb in SUBPATH_1_CUBICS]
+    return [Subpath(cubics=cubics, closed=SUBPATH_1_CLOSED)]
+
+
+def enforce_c1_on_subpath(subpath: Subpath) -> Subpath:
+    """Ajusta los handles de cada union para imponer continuidad C1."""
+    cubics = [cb.copy() for cb in subpath.cubics]
+    if len(cubics) < 2:
+        return Subpath(cubics=cubics, closed=subpath.closed)
+
+    n_segments = len(cubics)
+    n_joints = n_segments if subpath.closed else n_segments - 1
+
+    for idx in range(n_joints):
+        next_idx = (idx + 1) % n_segments
+        joint = cubics[idx][3].copy()
+        prev_handle = joint - cubics[idx][2]
+        next_handle = cubics[next_idx][1] - cubics[next_idx][0]
+        avg_handle = 0.5 * (prev_handle + next_handle)
+        cubics[idx][2] = joint - avg_handle
+        cubics[next_idx][1] = joint + avg_handle
+
+    return Subpath(cubics=cubics, closed=subpath.closed)
+
+
+def continuity_report(subpath: Subpath, tol: float = 1e-9) -> ContinuityReport:
+    """Calcula errores de continuidad C0 y C1 entre tramos consecutivos."""
+    positional_discontinuities: List[Tuple[int, int, float]] = []
+    derivative_mismatches: List[Tuple[int, int, float]] = []
+    max_positional_gap = 0.0
+    max_derivative_mismatch = 0.0
+
+    if len(subpath.cubics) < 2:
+        return ContinuityReport(
+            max_positional_gap=max_positional_gap,
+            max_derivative_mismatch=max_derivative_mismatch,
+            positional_discontinuities=positional_discontinuities,
+            derivative_mismatches=derivative_mismatches,
+        )
+
+    n_segments = len(subpath.cubics)
+    n_joints = n_segments if subpath.closed else n_segments - 1
+
+    for idx in range(n_joints):
+        next_idx = (idx + 1) % n_segments
+        end_point = subpath.cubics[idx][3]
+        start_point = subpath.cubics[next_idx][0]
+        positional_gap = float(np.linalg.norm(end_point - start_point))
+        max_positional_gap = max(max_positional_gap, positional_gap)
+        if positional_gap > tol:
+            positional_discontinuities.append((idx, next_idx, positional_gap))
+
+        deriv_gap = float(
+            np.linalg.norm(
+                cubic_end_tangent(subpath.cubics[idx])
+                - cubic_start_tangent(subpath.cubics[next_idx])
+            )
+        )
+        max_derivative_mismatch = max(max_derivative_mismatch, deriv_gap)
+        if deriv_gap > tol:
+            derivative_mismatches.append((idx, next_idx, deriv_gap))
+
+    return ContinuityReport(
+        max_positional_gap=max_positional_gap,
+        max_derivative_mismatch=max_derivative_mismatch,
+        positional_discontinuities=positional_discontinuities,
+        derivative_mismatches=derivative_mismatches,
+    )
+
+
+def get_circuit_subpaths() -> List[Subpath]:
+    """Retorna el circuito ajustado para cumplir continuidad C1."""
+    return [enforce_c1_on_subpath(sp) for sp in raw_circuit_subpaths()]
 
 
 # ============================================================================
@@ -112,29 +191,29 @@ def get_logo_subpaths() -> List[Subpath]:
 
 def de_casteljau(ctrl: np.ndarray, t: float) -> np.ndarray:
     """
-    Evalúa una curva Bézier en el parámetro t usando el algoritmo de De Casteljau.
+    Evalua una curva Bezier en el parametro t usando De Casteljau recursivo.
 
     Args:
         ctrl: Array (n, 2) con n puntos de control
-        t: Parámetro en [0, 1]
+        t: Parametro en [0, 1]
 
     Returns:
         Punto (x, y) en la curva
     """
     p = np.array(ctrl, dtype=float, copy=True)
-    n = p.shape[0]
-    for k in range(1, n):
-        p[: n - k] = (1.0 - t) * p[: n - k] + t * p[1 : n - k + 1]
-    return p[0]
+    if p.shape[0] == 1:
+        return p[0]
+    reduced = (1.0 - t) * p[:-1] + t * p[1:]
+    return de_casteljau(reduced, t)
 
 
 def sample_bezier(ctrl: np.ndarray, n_samples: int = 200) -> np.ndarray:
     """
-    Muestrea n puntos uniformemente a lo largo de una curva Bézier.
+    Muestrea n puntos uniformemente a lo largo de una curva Bezier.
 
     Args:
-        ctrl: Array (4, 2) con puntos de control de la cúbica
-        n_samples: Número de puntos a muestrear
+        ctrl: Array (4, 2) con puntos de control de la cubica
+        n_samples: Numero de puntos a muestrear
 
     Returns:
         Array (n_samples, 2) con los puntos de la curva
@@ -144,24 +223,26 @@ def sample_bezier(ctrl: np.ndarray, n_samples: int = 200) -> np.ndarray:
 
 
 # ============================================================================
-# Visualización
+# Visualizacion
 # ============================================================================
 
 
-def plot_logo(
+def plot_circuit(
     subpaths: List[Subpath],
     title: str,
     samples_per_segment: int = 220,
-    show_fill: bool = True,
+    show_fill: bool = False,
     show_control_points: bool = True,
+    output_path: FilePath | None = None,
+    show: bool = True,
 ) -> None:
     """
-    Dibuja el logo usando curvas Bézier.
+    Dibuja el circuito usando curvas Bezier.
 
     Args:
-        subpaths: Lista de subpaths con curvas Bézier
-        title: Título del gráfico
-        samples_per_segment: Puntos por segmento Bézier
+        subpaths: Lista de subpaths con curvas Bezier
+        title: Titulo del grafico
+        samples_per_segment: Puntos por segmento Bezier
         show_fill: Si mostrar el relleno
         show_control_points: Si mostrar los puntos de control
     """
@@ -174,15 +255,12 @@ def plot_logo(
         polygon_points = []
 
         for j, cubic in enumerate(sp.cubics):
-            # Muestrear la curva
             curve_points = sample_bezier(cubic, n_samples=samples_per_segment)
 
-            # Evitar duplicar el último punto excepto en el último segmento
             if j != len(sp.cubics) - 1:
                 curve_points = curve_points[:-1]
             polygon_points.append(curve_points)
 
-            # Dibujar puntos de control
             if show_control_points:
                 ax.plot(
                     cubic[:, 0],
@@ -198,30 +276,35 @@ def plot_logo(
             poly = np.vstack(polygon_points)
             ax.plot(poly[:, 0], poly[:, 1], linewidth=2.0)
 
-            # Construir path para relleno
             vertices.append((poly[0, 0], poly[0, 1]))
-            codes.append(Path.MOVETO)
+            codes.append(int(MplPath.MOVETO))
             for k in range(1, poly.shape[0]):
                 vertices.append((poly[k, 0], poly[k, 1]))
-                codes.append(Path.LINETO)
+                codes.append(int(MplPath.LINETO))
             vertices.append((poly[0, 0], poly[0, 1]))
-            codes.append(Path.CLOSEPOLY)
+            codes.append(int(MplPath.CLOSEPOLY))
 
-    # Aplicar relleno
     if show_fill and vertices:
-        path = Path(vertices, codes)
+        path = MplPath(vertices, codes)
         patch = PathPatch(path, alpha=0.25, facecolor="blue", edgecolor="none")
-        try:
-            patch.set_fillrule("evenodd")
-        except AttributeError:
-            pass
+        set_fillrule = getattr(patch, "set_fillrule", None)
+        if callable(set_fillrule):
+            set_fillrule("evenodd")
         ax.add_patch(patch)
 
     ax.set_aspect("equal", adjustable="box")
     ax.set_title(title)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.show()
+
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=200, bbox_inches="tight")
+
+    if show:
+        plt.show()
+
+    plt.close(fig)
 
 
 def modify_control_points(
@@ -231,16 +314,16 @@ def modify_control_points(
     delta: Tuple[float, float] = (15.0, -10.0),
 ) -> List[Subpath]:
     """
-    Modifica los puntos de control de un segmento específico.
+    Modifica los puntos de control de un segmento especifico.
 
     Args:
         subpaths: Lista de subpaths original
-        subpath_idx: Índice del subpath a modificar
-        segment_idx: Índice del segmento dentro del subpath
+        subpath_idx: Indice del subpath a modificar
+        segment_idx: Indice del segmento dentro del subpath
         delta: Desplazamiento (dx, dy) a aplicar
 
     Returns:
-        Nueva lista de subpaths con la modificación
+        Nueva lista de subpaths con la modificacion
     """
     d = np.array(delta, dtype=float)
     result = []
@@ -248,23 +331,50 @@ def modify_control_points(
     for si, sp in enumerate(subpaths):
         cubics = [cb.copy() for cb in sp.cubics]
         if si == subpath_idx and 0 <= segment_idx < len(cubics):
-            # Modificar puntos de control C1 y C2
             cubics[segment_idx][1] += d
             cubics[segment_idx][2] -= 0.6 * d
+
+            n_segments = len(cubics)
+            start_joint = cubics[segment_idx][0].copy()
+            end_joint = cubics[segment_idx][3].copy()
+
+            if sp.closed or segment_idx > 0:
+                prev_idx = (segment_idx - 1) % n_segments
+                cubics[prev_idx][2] = 2.0 * start_joint - cubics[segment_idx][1]
+
+            if sp.closed or segment_idx < n_segments - 1:
+                next_idx = (segment_idx + 1) % n_segments
+                cubics[next_idx][1] = 2.0 * end_joint - cubics[segment_idx][2]
+
         result.append(Subpath(cubics=cubics, closed=sp.closed))
 
     return result
+
+
+def print_continuity_report(label: str, subpaths: List[Subpath]) -> None:
+    """Imprime un resumen compacto de continuidad del trazado."""
+    print(f"\nContinuidad - {label}:")
+    for idx, subpath in enumerate(subpaths):
+        report = continuity_report(subpath)
+        print(
+            "subpath "
+            f"{idx}: max_gap={report.max_positional_gap:.6g}, "
+            f"max_deriv={report.max_derivative_mismatch:.6g}, "
+            f"C0_fallos={len(report.positional_discontinuities)}, "
+            f"C1_fallos={len(report.derivative_mismatches)}"
+        )
 
 
 def plot_comparison(
     original: List[Subpath],
     modified: List[Subpath],
     samples_per_segment: int = 220,
+    output_path: FilePath | None = None,
+    show: bool = True,
 ) -> None:
-    """Dibuja comparación entre logo original y modificado."""
+    """Dibuja comparacion entre circuito original y modificado."""
     fig, ax = plt.subplots(figsize=(10, 10))
 
-    # Dibujar original (línea continua)
     for sp in original:
         points = []
         for j, cubic in enumerate(sp.cubics):
@@ -276,7 +386,6 @@ def plot_comparison(
             poly = np.vstack(points)
             ax.plot(poly[:, 0], poly[:, 1], linewidth=2.0, label="Original")
 
-    # Dibujar modificado (línea discontinua)
     for sp in modified:
         points = []
         for j, cubic in enumerate(sp.cubics):
@@ -295,62 +404,112 @@ def plot_comparison(
             )
 
     ax.set_aspect("equal", adjustable="box")
-    ax.set_title("Comparativa: original (continua) vs modificado (discontinua)")
+    ax.set_title(
+        "Comparativa: original (linea continua) vs modificado (linea discontinua)"
+    )
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.show()
+
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=200, bbox_inches="tight")
+
+    if show:
+        plt.show()
+
+    plt.close(fig)
 
 
 # ============================================================================
-# Demostración
+# Demostracion
 # ============================================================================
 
 
-def run_demo(samples_per_segment: int = 220) -> None:
-    """Ejecuta la demostración completa del logo con curvas Bézier."""
-    subpaths = get_logo_subpaths()
+def run_demo(
+    samples_per_segment: int = 220,
+    output_dir: FilePath | None = None,
+    show: bool = True,
+) -> None:
+    """Ejecuta la demostracion completa del circuito con curvas Bezier."""
+    raw_subpaths = raw_circuit_subpaths()
+    subpaths = get_circuit_subpaths()
 
-    # 1. Logo original con puntos de control
-    plot_logo(
+    print_continuity_report("trazado base definido en codigo", raw_subpaths)
+    print_continuity_report("circuito ajustado a C1", subpaths)
+
+    original_path = None
+    modified_path = None
+    comparison_path = None
+    if output_dir is not None:
+        original_path = output_dir / "ex2_interlagos_original.png"
+        modified_path = output_dir / "ex2_interlagos_modificado.png"
+        comparison_path = output_dir / "ex2_interlagos_comparacion.png"
+
+    plot_circuit(
         subpaths,
-        title="Logo como spline Bézier cúbica (De Casteljau) con puntos de control",
+        title="Circuito de Interlagos como spline Bezier cubica (De Casteljau)",
         samples_per_segment=samples_per_segment,
-        show_fill=True,
+        show_fill=False,
         show_control_points=True,
+        output_path=original_path,
+        show=show,
     )
 
-    # 2. Logo con modificación de puntos de control
     subpaths_modified = modify_control_points(
         subpaths,
         subpath_idx=0,
         segment_idx=2,
         delta=(18.0, -12.0),
     )
-    plot_logo(
+    print_continuity_report("circuito modificado", subpaths_modified)
+
+    plot_circuit(
         subpaths_modified,
-        title="Variante tras modificar puntos de control (impacto geométrico)",
+        title="Interlagos tras modificar puntos de control",
         samples_per_segment=samples_per_segment,
-        show_fill=True,
+        show_fill=False,
         show_control_points=True,
+        output_path=modified_path,
+        show=show,
     )
 
-    # 3. Comparación lado a lado
-    plot_comparison(subpaths, subpaths_modified, samples_per_segment)
+    plot_comparison(
+        subpaths,
+        subpaths_modified,
+        samples_per_segment,
+        output_path=comparison_path,
+        show=show,
+    )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Visualización de logo mediante curvas Bézier cúbicas"
+        description="Visualizacion del circuito de Interlagos mediante curvas Bezier cubicas"
     )
     parser.add_argument(
         "--samples-per-seg",
         type=int,
         default=420,
-        help="Puntos de muestreo por segmento Bézier (default: 220)",
+        help="Puntos de muestreo por segmento Bezier (default: 420)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=FilePath,
+        default=None,
+        help="Directorio donde guardar las figuras generadas",
+    )
+    parser.add_argument(
+        "--no-show",
+        action="store_true",
+        help="No abrir las ventanas de Matplotlib",
     )
     args = parser.parse_args()
 
-    run_demo(samples_per_segment=max(30, args.samples_per_seg))
+    run_demo(
+        samples_per_segment=max(30, args.samples_per_seg),
+        output_dir=args.output_dir,
+        show=not args.no_show,
+    )
 
 
 if __name__ == "__main__":

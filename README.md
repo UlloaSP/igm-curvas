@@ -1,2 +1,176 @@
-# igm-curvas
-Práctica Curvas
+# Informe breve
+
+## Datos del grupo
+
+- Integrante 1: Pablo Ulloa Santín            - pablo.ulloa.santin@udc.es
+- Integrante 2: Pablo Méndez Vázquez          - p.mendez.vazquez@udc.es
+- Integrante 3: Francisco Javier Espada Radío - j.espada@udc.es
+
+Se entrega este informe junto con el codigo fuente `ex1.py` y `ex2.py`.
+
+Se ejecutaron los scripts `ex1.py` (Ejercicio 1) y `ex2.py` (Ejercicio 2) con los comandos:
+
+```bash
+uv run python ex1.py --no-show --output-dir outputs
+uv run python ex2.py --no-show --output-dir outputs
+```
+
+## Ejercicio 1 - Monte Carlo para toro y esferas
+
+En este ejercicio se estima por Monte Carlo el volumen de un toroide, el de dos esferas, el de las intersecciones toro-esfera y el de la union de los tres solidos.
+
+### Como se generan los puntos aleatorios
+
+Se trabaja dentro de la caja contenedora `[-3, 3] x [-3, 3] x [-3, 3]`, cuyo volumen es `V_caja = 216`. Para generar puntos uniformes en esa caja, se toman `x`, `y` y `z` de manera independiente con distribucion uniforme en el intervalo `[-3, 3]`. Cada muestra genera por tanto un punto aleatorio del espacio con igual probabilidad en cualquier posicion de la caja.
+
+Una vez generado cada punto, se comprueba si pertenece:
+- al toro `T`,
+- a la esfera derecha `S1`,
+- a la esfera izquierda `S2`,
+- a las intersecciones `T inter S1` y `T inter S2`,
+- y a la union `T union S1 union S2`.
+
+El volumen de cada conjunto se estima como:
+
+`V_hat = V_caja * (numero de puntos dentro del conjunto / N)`
+
+donde `N` es el numero total de puntos generados.
+
+### Como se hizo el calculo
+
+Para decidir si un punto pertenece al toro se usa la forma algebraica equivalente:
+
+`(x^2 + y^2 + z^2 + R^2 - r^2)^2 <= 4 R^2 (x^2 + y^2)`
+
+con `R = 1.5` y `r = 0.5`.
+
+Para las esferas se usan las ecuaciones:
+- `S1`: centro `(2, 0, 0)` y radio `0.5`
+- `S2`: centro `(-2, 0, 0)` y radio `0.5`
+
+Tambien se calcula:
+- la interseccion `T inter S1`,
+- la interseccion `T inter S2`,
+- la union `T union S1 union S2`.
+
+Ademas, para el toro y las esferas se comparan las estimaciones con los valores exactos:
+- toro: `V_T = 2 pi^2 R r^2`
+- esfera: `V_S = (4/3) pi r_s^3`
+
+### Output completo de `ex1.py`
+
+```text
+Resultados Monte Carlo:
+               objeto    V_hat   V_exact      N  box  V_box   abs_error   rel_error          SE  CI95_low  CI95_high
+   T (toroide solido)   7.4142    7.4022 600000 cube    216   0.0119967  0.00162069    0.050769   7.31469    7.51371
+  S1 (esfera derecha)  0.50256  0.523599 600000 cube    216   0.0210388   0.0401811   0.0134351  0.476227   0.528893
+S2 (esfera izquierda)  0.52596  0.523599 600000 cube    216  0.00236122  0.00450961   0.0137435  0.499023   0.552897
+           T inter S1  0.20016       NaN 600000 cube    216         NaN         NaN  0.00848474   0.18353    0.21679
+           T inter S2  0.19908       NaN 600000 cube    216         NaN         NaN  0.00846184  0.182495   0.215665
+  T union S1 union S2  8.04348       NaN 600000 cube    216         NaN         NaN   0.0527998   7.93999    8.14697
+
+Comprobaciones de consistencia:
+VS1 - VS2 = -0.0234
+V(T inter S1) - V(T inter S2) =  0.00108
+Vunion - (VT + VS1 + VS2 - V(T inter S1) - V(T inter S2)) =  0
+Vunion - (VT + 2VS - 2Vinters) =  0
+```
+
+### Explicacion de los resultados
+
+- `T (toroide solido)`: el volumen estimado es `7.4142`, muy proximo al valor exacto `7.4022`. El error relativo es `0.16%`, asi que la estimacion es muy buena.
+- `S1 (esfera derecha)`: el volumen estimado es `0.50256`, frente al valor exacto `0.523599`. La diferencia es pequena y compatible con el error muestral.
+- `S2 (esfera izquierda)`: el volumen estimado es `0.52596`, tambien muy cercano a `0.523599`.
+- `T inter S1` y `T inter S2`: las dos intersecciones se estiman como `0.20016` y `0.19908`. Son practicamente iguales, lo que confirma numericamente la simetria esperada.
+- `T union S1 union S2`: la union total de los tres solidos se estima en `8.04348`.
+
+Las columnas de la tabla significan:
+- `V_hat`: volumen estimado por Monte Carlo.
+- `V_exact`: volumen exacto cuando se conoce.
+- `abs_error`: error absoluto `|V_hat - V_exact|`.
+- `rel_error`: error relativo absoluto.
+- `SE`: error estandar del estimador.
+- `CI95_low` y `CI95_high`: extremos del intervalo de confianza aproximado del 95%.
+
+### Comprobaciones de consistencia
+
+Las lineas finales sirven para verificar que el resultado es coherente:
+
+- `VS1 - VS2 = -0.0234`: las dos esferas tienen practicamente el mismo volumen estimado, como debe ocurrir por simetria.
+- `V(T inter S1) - V(T inter S2) = 0.00108`: las dos intersecciones tambien son practicamente iguales.
+- `Vunion - (VT + VS1 + VS2 - V(T inter S1) - V(T inter S2)) = 0`: se cumple exactamente la formula de inclusion-exclusion con las estimaciones obtenidas.
+- `Vunion - (VT + 2VS - 2Vinters) = 0`: tambien se cumple la version simplificada aprovechando la simetria entre las esferas.
+
+Estas dos igualdades confirman que las mascaras logicas usadas en el codigo para intersecciones y union son consistentes entre si.
+
+![Visualizacion del toroide y las esferas](outputs/ex1_toro_y_esferas.png)
+
+En esta imagen se representa la geometria del problema del ejercicio 1. Se ve el toroide centrado en el origen y las dos esferas colocadas de forma simetrica a ambos lados del eje `x`. La imagen no muestra la nube de puntos del Monte Carlo, sino los solidos cuya pertenencia se comprueba en cada muestra. Esta visualizacion ayuda a entender por que las dos intersecciones y los dos volumenes esfericos deben ser muy parecidos.
+
+## Ejercicio 2 - Curvas de Bezier para una figura 2D
+
+En este ejercicio se construye una figura 2D mediante un spline a trozos formado por curvas de Bezier cubica. La figura elegida es el circuito de Interlagos.
+
+### Eleccion de la figura
+
+Se eligio el circuito de Interlagos porque es una figura 2D cerrada, reconocible y con suficiente complejidad geometrica como para necesitar varios tramos de curva enlazados. En esta entrega el trazado base se define directamente en el codigo, sin depender de un SVG externo durante la construccion de la figura. Esto lo hace apropiado para mostrar:
+- como se construye una figura a partir de varios segmentos de Bezier,
+- como influyen los puntos de control en la forma final,
+- y como una modificacion local altera solo una parte del trazado.
+
+### Como se construye la curva
+
+La figura se descompone en `23` tramos de Bezier cubica. Cada tramo modela una parte local del contorno del circuito y el conjunto de todos ellos reconstruye la curva cerrada completa. Cada tramo se define con `4` puntos de control, porque una curva de Bezier de grado `3` usa `n + 1 = 4` puntos de control:
+- `P0`: punto inicial,
+- `C1`: primer punto de control,
+- `C2`: segundo punto de control,
+- `P3`: punto final.
+
+Para cada tramo se usa la formula de Bezier cubica
+
+`B(t) = (1 - t)^3 P0 + 3 (1 - t)^2 t C1 + 3 (1 - t) t^2 C2 + t^3 P3`, con `t` en `[0, 1]`.
+
+En el codigo, esta evaluacion se realiza mediante una implementacion recursiva del algoritmo de De Casteljau, que obtiene puntos de la curva por interpolaciones sucesivas entre los puntos de control. El trazado base se almacena en `SUBPATH_1_CUBICS`, y a continuacion se ajustan los handles de cada union para imponer continuidad de primera derivada. Despues, se muestrean muchos puntos de cada tramo y se unen para dibujar el contorno completo con Matplotlib.
+
+### Continuidad entre tramos
+
+La continuidad pedida en el enunciado se comprueba y se fuerza explicitamente en el codigo. Primero se verifica que el trazado base ya cumple continuidad posicional (`C0`): el punto final de cada tramo coincide con el punto inicial del siguiente, de modo que no hay saltos ni huecos. Despues se ajustan los puntos de control interiores en cada union para igualar las derivadas laterales, imponiendo continuidad de primera derivada (`C1`).
+
+Para una union entre dos cubicas consecutivas, se toma el vector de salida del tramo anterior y el vector de entrada del tramo siguiente, y se sustituye ambos por su promedio. Asi, si `P` es el punto comun, se actualizan los handles para que el vector `P - C2` del tramo anterior coincida con el vector `C1 - P` del siguiente. De este modo, la tangente a ambos lados de la union pasa a ser la misma.
+
+Al ejecutar `ex2.py` se obtiene la siguiente comprobacion numerica de continuidad:
+- trazado base definido en codigo: `max_gap = 0`, `max_deriv = 333.999` y `23` fallos de `C1`;
+- circuito ajustado a `C1`: `max_gap = 0`, `max_deriv = 8.53e-14` y `0` fallos de `C1`;
+- circuito modificado: `max_gap = 0`, `max_deriv = 8.53e-14` y `0` fallos de `C1`.
+
+Por tanto, el trazado final no solo esta conectado correctamente, sino que tambien conserva continuidad tangencial entre todos los tramos.
+
+### Que se dibuja
+
+En las figuras se muestran:
+- la curva resultante,
+- los puntos de control de cada tramo,
+- y las rectas del poligono de control, incluidas las que unen los puntos proximos a los extremos de tramos consecutivos.
+
+Esto permite ver simultaneamente la forma final de la curva y la estructura geometrica que la genera.
+
+### Impacto de los puntos de control
+
+Una parte importante del ejercicio es comprobar como cambian las curvas al modificar los puntos de control. Para ello se genera:
+- una version original del circuito,
+- una version modificada,
+- y una comparativa superpuesta.
+
+En la modificacion se altera el tercer segmento del trazado principal (`segment_idx = 2`). Se desplaza uno de sus puntos de control interiores con `delta = (18.0, -12.0)` y el otro se ajusta con el desplazamiento opuesto escalado (`-0.6 * delta`). A continuacion, el codigo reajusta automaticamente los handles de los segmentos vecino anterior y vecino posterior para conservar la misma derivada en ambos empalmes. Esta operacion cambia localmente la forma de la curva sin romper ni la conexion posicional ni la continuidad `C1` con los tramos contiguos.
+
+![Circuito original](outputs/ex2_interlagos_original.png)
+
+Esta primera imagen muestra el circuito reconstruido mediante `23` tramos de Bezier cubica ya ajustados para cumplir continuidad `C1`. Los puntos visibles son los puntos de control y las lineas punteadas grises forman el poligono de control. La figura permite ver como una forma cerrada relativamente compleja puede modelarse mediante un spline a trozos manteniendo una tangencia coherente entre segmentos consecutivos.
+
+![Circuito modificado](outputs/ex2_interlagos_modificado.png)
+
+En esta segunda imagen se ve el mismo circuito tras modificar un tramo concreto del spline. Lo que se ha hecho es mover dos puntos de control interiores del tercer segmento para alterar su curvatura y, despues, reajustar los handles de los segmentos vecinos para preservar la continuidad `C1` en ambos empalmes. El efecto es local: cambia esa zona del circuito, pero el contorno sigue conectado, suave y reconocible.
+
+![Comparativa entre ambas curvas](outputs/ex2_interlagos_comparacion.png)
+
+La tercera imagen superpone la curva original y la curva modificada. En esta comparacion la curva original se dibuja con linea continua y la modificada con linea discontinua; ese estilo de trazado solo sirve para distinguir visualmente ambas curvas y no indica una discontinuidad geometrica. La comparacion permite ver con claridad el impacto geometrico de mover los puntos de control: la deformacion se concentra en la region afectada, mientras que el resto del circuito apenas cambia. Al mismo tiempo, la curva modificada mantiene continuidad `C1`, de modo que la transicion entre tramos sigue siendo suave. Es precisamente esta sensibilidad local, compatible con una continuidad controlada, una de las propiedades mas utiles de las curvas de Bezier para modelado geometrico.

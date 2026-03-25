@@ -1,15 +1,10 @@
-# practica_IGM_MC_Bezier.py
-# Requisitos: numpy, pandas, matplotlib
-# Ejecución ejemplo:
-#   python practica_IGM_MC_Bezier.py --N 800000 --seed 123 --box cube --torus-form sqrt
-#   python practica_IGM_MC_Bezier.py --N 800000 --seed 123 --box tight --torus-form poly
-
 from __future__ import annotations
 
 import argparse
 import math
 from dataclasses import dataclass
-from typing import Dict, List
+from pathlib import Path
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -18,8 +13,8 @@ import matplotlib.pyplot as plt
 
 @dataclass(frozen=True)
 class Box3D:
-    low: np.ndarray  # (3,)
-    high: np.ndarray  # (3,)
+    low: np.ndarray
+    high: np.ndarray
 
     @property
     def volume(self) -> float:
@@ -32,14 +27,12 @@ def make_box() -> Box3D:
 
 
 def sample_uniform_in_box(rng: np.random.Generator, box: Box3D, n: int) -> np.ndarray:
-    # Uniforme en caja axis-aligned: X = low + U*(high-low), U ~ U([0,1]^3)
+    # Muestreo uniforme en una caja alineada con los ejes.
     u = rng.random((n, 3), dtype=float)
     return box.low + u * (box.high - box.low)
 
 
 def inside_toroid_poly(pts: np.ndarray, R: float, r: float) -> np.ndarray:
-    # Forma equivalente sin raíz (enunciado):
-    # (x^2 + y^2 + z^2 + R^2 - r^2)^2 <= 4 R^2 (x^2 + y^2)
     x = pts[:, 0]
     y = pts[:, 1]
     z = pts[:, 2]
@@ -49,7 +42,6 @@ def inside_toroid_poly(pts: np.ndarray, R: float, r: float) -> np.ndarray:
 
 
 def inside_sphere_S1(pts: np.ndarray, rs: float) -> np.ndarray:
-    # (x-2)^2 + y^2 + z^2 <= rs^2
     x = pts[:, 0]
     y = pts[:, 1]
     z = pts[:, 2]
@@ -57,7 +49,6 @@ def inside_sphere_S1(pts: np.ndarray, rs: float) -> np.ndarray:
 
 
 def inside_sphere_S2(pts: np.ndarray, rs: float) -> np.ndarray:
-    # (x+2)^2 + y^2 + z^2 <= rs^2
     x = pts[:, 0]
     y = pts[:, 1]
     z = pts[:, 2]
@@ -65,7 +56,6 @@ def inside_sphere_S2(pts: np.ndarray, rs: float) -> np.ndarray:
 
 
 def exact_volumes(R: float, r: float, rs: float) -> Dict[str, float]:
-    # V_T exacto = 2 π^2 R r^2 ; V_S exacto = (4/3) π rs^3
     Vt = 2.0 * (math.pi**2) * R * (r**2)
     Vs = (4.0 / 3.0) * math.pi * (rs**3)
     return {"V_T_exact": Vt, "V_S_exact": Vs}
@@ -76,23 +66,17 @@ def volume_mc(Vbox: float, count: int, N: int) -> float:
 
 
 def se_mc(Vbox: float, count: int, N: int) -> float:
-    # Error estándar del estimador Bernoulli: Vbox * sqrt(p(1-p)/N), con p = count/N
+    # Error estandar del estimador Bernoulli Vbox * sqrt(p(1-p)/N).
     p = count / N
     return Vbox * math.sqrt(p * (1.0 - p) / N)
 
 
 def run_ex1(
-    N: int,
-    seed: int,
-    batch: int,
-    R: float = 1.5,
-    r: float = 0.5,
-    rs: float = 0.5
+    N: int, seed: int, batch: int, R: float = 1.5, r: float = 0.5, rs: float = 0.5
 ) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     box = make_box()
     Vbox = box.volume
-
 
     c_T = 0
     c_S1 = 0
@@ -136,19 +120,19 @@ def run_ex1(
     VU = volume_mc(Vbox, c_union, N)
 
     rows = [
-        {"objeto": "T (toroide sólido)", "V_hat": VT, "V_exact": Vt_exact},
+        {"objeto": "T (toroide solido)", "V_hat": VT, "V_exact": Vt_exact},
         {"objeto": "S1 (esfera derecha)", "V_hat": VS1, "V_exact": Vs_exact},
         {"objeto": "S2 (esfera izquierda)", "V_hat": VS2, "V_exact": Vs_exact},
-        {"objeto": "T∩S1", "V_hat": VTS1, "V_exact": np.nan},
-        {"objeto": "T∩S2", "V_hat": VTS2, "V_exact": np.nan},
-        {"objeto": "T∪S1∪S2", "V_hat": VU, "V_exact": np.nan},
+        {"objeto": "T inter S1", "V_hat": VTS1, "V_exact": np.nan},
+        {"objeto": "T inter S2", "V_hat": VTS2, "V_exact": np.nan},
+        {"objeto": "T union S1 union S2", "V_hat": VU, "V_exact": np.nan},
     ]
 
     df = pd.DataFrame(rows)
     df["N"] = N
     df["box"] = "cube"
     df["V_box"] = Vbox
-    df["abs_error"] = df["V_hat"] - df["V_exact"]
+    df["abs_error"] = (df["V_hat"] - df["V_exact"]).abs()
     df["rel_error"] = df["abs_error"] / df["V_exact"]
     df.loc[df["V_exact"].isna(), ["abs_error", "rel_error"]] = np.nan
 
@@ -174,66 +158,76 @@ def run_ex1(
 
     print("\nComprobaciones de consistencia:")
     print(f"VS1 - VS2 = {VS1 - VS2: .6g}")
-    print(f"V(T∩S1) - V(T∩S2) = {VTS1 - VTS2: .6g}")
-    print(f"Vunión - (VT + VS1 + VS2 - V(T∩S1) - V(T∩S2)) = {VU - Vincl_excl: .6g}")
-    print(f"Vunión - (VT + 2VS - 2Vinters) = {VU - Vsym: .6g}")
+    print(f"V(T inter S1) - V(T inter S2) = {VTS1 - VTS2: .6g}")
+    print(
+        f"Vunion - (VT + VS1 + VS2 - V(T inter S1) - V(T inter S2)) = {VU - Vincl_excl: .6g}"
+    )
+    print(f"Vunion - (VT + 2VS - 2Vinters) = {VU - Vsym: .6g}")
 
     return df
 
 
-def plot_torus_and_spheres(R: float = 1.5, r: float = 0.5, rs: float = 0.5) -> None:
+def plot_torus_and_spheres(
+    R: float = 1.5,
+    r: float = 0.5,
+    rs: float = 0.5,
+    output_path: Path | None = None,
+    show: bool = True,
+) -> None:
     """Visualiza el toro y las dos esferas S1 y S2 en 3D."""
     fig = plt.figure(figsize=(12, 8))
-    ax = fig.add_subplot(111, projection='3d')
-    
-    # Generar el toro
+    ax = fig.add_subplot(111, projection="3d")
+
     u = np.linspace(0, 2 * np.pi, 60)
     v = np.linspace(0, 2 * np.pi, 60)
     u, v = np.meshgrid(u, v)
-    
+
     x_torus = (R + r * np.cos(v)) * np.cos(u)
     y_torus = (R + r * np.cos(v)) * np.sin(u)
     z_torus = r * np.sin(v)
-    
-    # Generar esfera S1 (centro en x=2)
+
     phi = np.linspace(0, np.pi, 30)
     theta = np.linspace(0, 2 * np.pi, 30)
     phi, theta = np.meshgrid(phi, theta)
-    
+
     x_s1 = rs * np.sin(phi) * np.cos(theta) + 2.0
     y_s1 = rs * np.sin(phi) * np.sin(theta)
     z_s1 = rs * np.cos(phi)
-    
-    # Generar esfera S2 (centro en x=-2)
+
     x_s2 = rs * np.sin(phi) * np.cos(theta) - 2.0
     y_s2 = rs * np.sin(phi) * np.sin(theta)
     z_s2 = rs * np.cos(phi)
-    
-    # Dibujar las superficies
-    ax.plot_surface(x_torus, y_torus, z_torus, alpha=0.6, color='blue', label='Toro')
-    ax.plot_surface(x_s1, y_s1, z_s1, alpha=0.7, color='red')
-    ax.plot_surface(x_s2, y_s2, z_s2, alpha=0.7, color='green')
-    
-    # Configurar ejes
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.set_title(f'Toro (R={R}, r={r}) y Esferas S1, S2 (rs={rs})')
-    
-    # Leyenda manual (plot_surface no soporta label directamente)
+
+    ax.plot_surface(x_torus, y_torus, z_torus, alpha=0.6, color="blue", label="Toro")
+    ax.plot_surface(x_s1, y_s1, z_s1, alpha=0.7, color="red")
+    ax.plot_surface(x_s2, y_s2, z_s2, alpha=0.7, color="green")
+
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_title(f"Toro (R={R}, r={r}) y Esferas S1, S2 (rs={rs})")
+
     from matplotlib.patches import Patch
+
     legend_elements = [
-        Patch(facecolor='blue', alpha=0.6, label='Toro'),
-        Patch(facecolor='red', alpha=0.7, label='S1 (x=2)'),
-        Patch(facecolor='green', alpha=0.7, label='S2 (x=-2)')
+        Patch(facecolor="blue", alpha=0.6, label="Toro"),
+        Patch(facecolor="red", alpha=0.7, label="S1 (x=2)"),
+        Patch(facecolor="green", alpha=0.7, label="S2 (x=-2)"),
     ]
-    ax.legend(handles=legend_elements, loc='upper left')
-    
-    # Ajustar aspecto
+    ax.legend(handles=legend_elements, loc="upper left")
+
     ax.set_box_aspect([1, 1, 0.3])
-    
+
     plt.tight_layout()
-    plt.show()
+
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=200, bbox_inches="tight")
+
+    if show:
+        plt.show()
+
+    plt.close(fig)
 
 
 def main() -> None:
@@ -241,16 +235,26 @@ def main() -> None:
     parser.add_argument("--N", type=int, default=600000)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--batch", type=int, default=100000)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Directorio donde guardar la figura generada",
+    )
+    parser.add_argument(
+        "--no-show",
+        action="store_true",
+        help="No abrir la ventana de Matplotlib",
+    )
     args = parser.parse_args()
 
-    run_ex1(
-        N=args.N,
-        seed=args.seed,
-        batch=max(1, args.batch)
-    )
-    
-    # Visualizar el toro y las esferas
-    plot_torus_and_spheres()
+    run_ex1(N=args.N, seed=args.seed, batch=max(1, args.batch))
+
+    output_path = None
+    if args.output_dir is not None:
+        output_path = args.output_dir / "ex1_toro_y_esferas.png"
+
+    plot_torus_and_spheres(output_path=output_path, show=not args.no_show)
 
 
 if __name__ == "__main__":
