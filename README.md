@@ -1,4 +1,4 @@
-# Informe breve
+# Informe
 
 ## Datos del grupo
 
@@ -8,7 +8,7 @@
 
 Se entrega este informe junto con el codigo fuente `ex1.py` y `ex2.py`.
 
-Se ejecutaron los scripts `ex1.py` (Ejercicio 1) y `ex2.py` (Ejercicio 2) con los comandos:
+Se ejecutan los scripts `ex1.py` (Ejercicio 1) y `ex2.py` (Ejercicio 2) con los comandos:
 
 ```bash
 python ex1.py --output-dir outputs
